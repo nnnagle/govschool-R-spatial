@@ -1,0 +1,164 @@
+---
+title: "01_plot_counties.Rmd"
+output: html_document
+---
+
+# Planning my attack
+When I plan my analyses, I usually do it in in this order: First, I think about what my *research question* is. Second, I think about what I need to *meausure*, third, I think about how I will *communicate* that to my audience. I can do all of this before I have data, and doing this helps me to stay on track. Everything I do must help me to reach this goal.
+
+For this tutorial: First, I want to know what the relationship is between race and the incidence of COVID-19. Second, I think that I will measure this by collecting county-level data for the percent black, and fraction of people with COVID-19. Third, I think that I want to visualize this with maps of percent black and percent with COVID, and perhaps with a correlation coefficient between the two. In this tutorial, though, I'll just do the mapping.
+
+How will I do this? I'll need the following data:
+
+Percent Black or African-American for each county.  Where will I get this? The Census Bureau. I might find Percent Black, but I might also only find the Population that is Black or African American, in which case I'll also need the Total Population so that I calculate the Percent.
+
+I'll also need the Percent of people in each county that have had COVID-19. Where will I get this? If I am working with a single state, I might go to the State Department of Health, and see if they have data to download. If I am working with the entire nation, I might go to someplase like the Johns Hopkins University dataset that has done a lot of work to collect data from all 50 states and to put them in one file. Again, I might not find the percent, so I might need to get the number of total cases and the Total Population.
+
+I'll also need some way to map the data.  I need data with the name and boundary of each county.
+
+The data have already been downloaded and cleaned and put in the data folder. If you finish with the mapping tutorial and are looking for something a little harder, go ahead and look at 00_get_data.Rmd where I show how I collected and cleaned these data.
+
+# Data
+The data are in three files. First, there are files with the name 'cb_2018_us_county-20'. These files go together: they are called a "shapefile", which is the standard format for geographic data. These data just contain information about the boundaries of every county in the US.
+
+The second file is called `tn_county_acs.csv` and contains basic demographic characteristics from the census bureau for each county in Tennessee.
+
+The third file is called `tn_covid.csv` and contains data from the Tennessee Department of Health about cases of COVID-19 on each day in each county.
+
+The three files will need to be joined into one file. Fortunately, all three files contain a column called "GEOID" that has a 5-digit number that is unique to each county.
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(sf)
+```
+
+```{r}
+counties <- st_read('data/cb_2018_us_county_20m.shp')
+counties
+```
+
+You should see that counties is a table, just like normal data. There's a bunch of columns we don't care about, but GEOID and NAME are important. Also, there the column called `geometry`.  You don't need to worry about that, but R needs that to produce a map.  
+
+The first column is a two digit "State FIPS code".  This is every county in the US.  We don't need every county, just Tennessee. The FIPS code for Tennessee is '47'. So we can filter our data down to just Tennessee:
+
+```{r}
+counties <- filter(counties, STATEFP=='47')
+```
+
+
+```{r}
+tn_covid <- read_csv('data/tn_covid.csv')
+tn_county_acs <- read_csv('data/tn_county_acs.csv')
+```
+
+```{r}
+tn_covid <- filter(tn_covid, DATE==lubridate::as_date('2020-06-04'))
+```
+
+
+```{r, error=TRUE}
+counties <- 
+  left_join(x = counties,
+            y = tn_county_acs,
+            by = 'GEOID')
+```
+
+you get an error telling you that one dataset has a column called GEOID that is a factor ('categorical') variable, and the other has a column called GEOID that is numeric.  It's true, a code called something like "47001" could be numeric, but we should really treat it the same as a name.
+
+```{r}
+counties <- 
+  left_join(x = counties %>% mutate(GEOID = as.character(GEOID)),
+            y = tn_county_acs %>% mutate(GEOID=as.character(GEOID)),
+            by = 'GEOID')
+counties <- 
+  left_join(x=counties,
+            y = tn_covid %>% mutate(GEOID = as.character(GEOID)),
+            by = 'GEOID')
+```
+
+```{r}
+counties <- mutate(counties,
+                   COVID_RATE = TOTAL_CASES / population)
+```
+
+
+```{r}
+ggplot(data=counties) +
+  geom_sf(mapping = aes(fill=COVID_RATE))
+```
+
+We only see three counties. A common challenge in mapping is that a few outliers mask all the other data. In this case, these three counties just happend to be small counties, that have large prisons, where there has been an outbreak. We should look at what values are typical:
+
+```{r}
+quantile(counties$COVID_RATE*10000)
+```
+
+It is best to map categorical variables:
+
+```{r}
+counties$covid_rate_cat <- cut(counties$COVID_RATE*10000,
+                               breaks=c(0,5,10,20,50,2000),
+                               ordered_result = TRUE)
+```
+
+```{r}
+ggplot(data=counties) +
+  geom_sf(mapping = aes(fill=covid_rate_cat))
+```
+
+## Clean up the axes
+
+Axes are important in most data visualizations. In this viz, the color legend is necesarry. But are the x and y axes important? Does knowing the longitude and latitude help to understand the data? No, they just get in the way.  
+
+```{r}
+ggplot(data=counties) +
+  geom_sf(mapping = aes(fill=covid_rate_cat)) + 
+  coord_sf(datum = NA)
+```
+
+If you want to get rid of the background, you can do this:
+
+```{r}
+ggplot(data=counties) +
+  geom_sf(mapping = aes(fill=covid_rate_cat)) + 
+  theme_void()
+```
+
+I can't always remember these recipes.  I usually google them.
+
+## Changing the legend label
+
+```{r}
+ggplot(data=counties) +
+  geom_sf(mapping = aes(fill=covid_rate_cat)) + 
+  theme_void() +
+  scale_fill_ordinal('Rate (Cases per 10,000 persons)')
+```
+
+## Changing the color scale
+The basic colors that are used for mapping aren't great. There's actually a science behind what colors to use. You want each color to be easily distinguished from the others, and you want to make sure that colorblind people can use your map too. The best resource for different colors is https://colorbrewer2.org/. Fortunately, these are available in R:
+
+
+```{r}
+ggplot(data=counties) +
+  geom_sf(mapping = aes(fill=covid_rate_cat)) + 
+  theme_void() +
+  scale_fill_brewer('Rate (Cases per 10,000 persons)',
+                    palette='YlOrRd')
+```
+
+# Map the Percent Black of African American
+
+```{r}
+counties <- mutate(counties,
+                   pct_black_cat = cut(pct_black, 
+                                       breaks = c(0, 2, 5, 10, 20, 40, 100)))
+ggplot(data=counties) +
+  geom_sf(mapping = aes(fill=pct_black_cat)) + 
+  theme_void() +
+  scale_fill_brewer('Percent Black/African-American',
+                    palette='YlOrRd')
+```
+
