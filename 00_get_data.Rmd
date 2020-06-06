@@ -140,4 +140,18 @@ write_csv(tn_covid, 'data/tn_covid.csv')
 ```
 
 ## Get the spatial boundary data
+Do a google search of "census county boundary file" and you'll find your way here: https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.html
 
+Download and upzip the file that says "cb_2018_us_county_20m"
+https://www2.census.gov/geo/tiger/GENZ2018/shp/cb_2018_us_county_20m.zip
+
+I've already done that in the data folder:
+
+```{r}
+download.file(url = 'https://www2.census.gov/geo/tiger/GENZ2018/shp/cb_2018_us_county_20m.zip',
+              destfile = 'data/cb_2018_us_county_20m.zip')
+unzip(zipfile = 'data/cb_2018_us_county_20m.zip',
+      exdir = 'data/')
+```
+
+We won't do anything more with this file here. Trust me: it's good to go.
