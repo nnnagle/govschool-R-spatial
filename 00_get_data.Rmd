@@ -127,10 +127,10 @@ tn_covid <- select(tn_covid,
                    TOTAL_HOSPITALIZED)
 tn_covid <- mutate(tn_covid,
                    NAME = paste(COUNTY,'County, Tennessee'))
-tn_covid <- left_join(x =tn_covid,
-                      y = select(county_census, GEOID, NAME),
-                      by = 'NAME',
-                      ignore_case=TRUE)
+tn_covid <- fuzzyjoin::regex_left_join(x =tn_covid,
+                                       y = select(county_census, GEOID, NAME),
+                                       by = 'NAME',
+                                       ignore_case=TRUE)
 tn_covid <- filter(tn_covid, !is.na(GEOID))
 ```
 
