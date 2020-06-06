@@ -26,6 +26,7 @@ The tidycensus package requires you to have a Census API key.  Anybody can get o
 
 Load the library and enter your api key
 ```{r}
+library(tidyverse)
 library(tidycensus)
 # Uncomment the next line and paste in an api key
 # census_api_key('KEY GOES HERE')
@@ -48,10 +49,14 @@ county_census <- get_acs(geography = 'county',
                          output = 'wide')
 county_census
 ```
+That's gross. The column names are codes, not English. Also, what is that "GEOID" column? Do we need it? The answer is "yes"; when we get to joining with the map boundaries, that column is coing to be amazing.
 
 I'm going to rename things so it's not as gross
+
 ```{r}
-county_census <- select(county_census, GEOID, NAME,
+county_census <- select(county_census, 
+                        GEOID, 
+                        NAME,
                         population = DP05_0001E,
                         age = DP05_0018E,
                         pct_black = DP05_0065PE,
@@ -61,9 +66,78 @@ county_census <- select(county_census, GEOID, NAME,
 county_census
 ```
 
-That's much better. We're done with getting the census data.
+That's much better. We're done with getting the census data. Let's save it to a more permanent location:
+```{r}
+write_csv(county_census, 'data/tn_county_acs.csv')
+```
 
 
-## Get the COVID data.
+## Load the COVID data.
+If you cruise around the tn.gov/health page, you will eventually get to Downloadable Datasets for COVID. There's one of new cases for Counties, I'll download it to the data folder
 
+```{r}
+download.file(url = 'https://www.tn.gov/content/dam/tn/health/documents/cedep/novel-coronavirus/datasets/Public-Dataset-County-New.XLSX',
+              destfile = 'data/tn-covid.xlsx')
+```
+
+You can open that up in excel and see what you've got, or do it here in R
+```{r}
+tn_covid <- readxl::read_xlsx('data/tn-covid.xlsx')
+tn_covid
+```
+
+Something that's a little gross is that there is no column that exactly matches the census data. The `County` column looks like it matches the `NAME` column in the census data, but it's not an exact match.
+
+
+```{r}
+tn_covid <- mutate(tn_covid,
+                   COUNTY2 = paste(COUNTY,'County, Tennessee'))
+```
+
+First effort: doesn't work:
+
+Try joining as it is. Show the rows that didn't join
+```{r}
+test <- left_join(x = tn_covid,
+                  y = county_census,
+                  by = c('COUNTY2'='NAME'))
+filter(test, is.na(GEOID))
+```
+
+Then Pending and Out of State cases don't match. That's expected and ok. But we will lose Dekalb County. That is not okay.
+
+```{r}
+test <- fuzzyjoin::regex_left_join(x = tn_covid,
+                  y = county_census,
+                  by = c('COUNTY2'='NAME'),
+                  ignore_case=TRUE)
+filter(test, is.na(GEOID))
+
+```
+
+That worked, the following code makes a clean dataset: added a column called NAME that matches the Census Data, and keeping only the TOTAL CASES and TOTAL_HOSPITALIZED columns
+
+```{r}
+tn_covid <- select(tn_covid,
+                   DATE,
+                   COUNTY,
+                   TOTAL_CASES,
+                   POS_TESTS,
+                   NEG_TESTS,
+                   TOTAL_HOSPITALIZED)
+tn_covid <- mutate(tn_covid,
+                   NAME = paste(COUNTY,'County, Tennessee'))
+tn_covid <- left_join(x =tn_covid,
+                      y = select(county_census, GEOID, NAME),
+                      by = 'NAME',
+                      ignore_case=TRUE)
+tn_covid <- filter(tn_covid, !is.na(GEOID))
+```
+
+That's a nice clean dataset, so we'll save it to the data folder
+```{r}
+write_csv(tn_covid, 'data/tn_covid.csv')
+```
+
+## Get the spatial boundary data
 
