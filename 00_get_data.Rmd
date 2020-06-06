@@ -1,0 +1,69 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Planning my attack
+When I plan my analyses, I usually do it in in this order: First, I think about what my *research question* is. Second, I think about what I need to *meausure*, third, I think about how I will *communicate* that to my audience. I can do all of this before I have data, and doing this helps me to stay on track. Everything I do must help me to reach this goal.
+
+For this tutorial: First, I want to know what the relationship is between race and the incidence of COVID-19. Second, I think that I will measure this by collecting county-level data for the percent black, and fraction of people with COVID-19. Third, I think that I want to visualize this with maps of percent black and percent with COVID, and perhaps with a correlation coefficient between the two. In this tutorial, though, I'll just do the mapping.
+
+How will I do this? I'll need the following data:
+
+Percent Black or African-American for each county.  Where will I get this? The Census Bureau. I might find Percent Black, but I might also only find the Population that is Black or African American, in which case I'll also need the Total Population so that I calculate the Percent.
+
+I'll also need the Percent of people in each county that have had COVID-19. Where will I get this? If I am working with a single state, I might go to the State Department of Health, and see if they have data to download. If I am working with the entire nation, I might go to someplase like the Johns Hopkins University dataset that has done a lot of work to collect data from all 50 states and to put them in one file. Again, I might not find the percent, so I might need to get the number of total cases and the Total Population.
+
+I'll also need some way to map the data.  I need data with the name and boundary of each county.
+
+Also, all of these data are going to have be joined together. So that's something to keep an eye out for.
+
+# Getting the data
+## Getting the race data
+The Census Bureau is the ultimate source of all official data in the United States about demographic characteristics like Race.  But there is a helpful R package to get this, called `tidycensus`. So make sure that you have the package first by running the command `install.packages('tidycensus')`.
+
+The tidycensus package requires you to have a Census API key.  Anybody can get one, but it will take you a few minutes. https://api.census.gov/data/key_signup.html
+
+Load the library and enter your api key
+```{r}
+library(tidycensus)
+# Uncomment the next line and paste in an api key
+# census_api_key('KEY GOES HERE')
+```
+
+There is a ton of census data, and you need to look through a catalog in order to find what you want. 
+Load the catalog for the 2018 American Community Survey Demographic Profile
+```{r}
+acs_catalog <- load_variables(year = 2018, dataset='acs5/profile')
+```
+
+There's only 1,346 variables to look through. In the command console, type `View(acs_variables)` and then search for the word "Black". Fortunately, there are only a few. There's even one for percent! I recommend using called "DP05_0065P".
+
+Looking ahead to other analyses we might do, I'm also going to get Percent Hispanic ("DP05_0070P"), Percent in Poverty ("DP03_0119P"), Median Age ("DP05__0018") and Total Population ("DP05_001")
+
+```{r}
+county_census <- get_acs(geography = 'county',
+                         variables = c('DP05_0001','DP05_0018','DP05_0065P','DP05_0071P','DP05_0018','DP03_0119P'),
+                         state = 'TN',
+                         output = 'wide')
+county_census
+```
+
+I'm going to rename things so it's not as gross
+```{r}
+county_census <- select(county_census, GEOID, NAME,
+                        population = DP05_0001E,
+                        age = DP05_0018E,
+                        pct_black = DP05_0065PE,
+                        pct_hisp = DP05_0071PE,
+                        pct_poverty = DP03_0119PE
+                        )
+county_census
+```
+
+That's much better. We're done with getting the census data.
+
+
+## Get the COVID data.
+
+
