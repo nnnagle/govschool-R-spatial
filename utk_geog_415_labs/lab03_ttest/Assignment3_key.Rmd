@@ -1,0 +1,332 @@
+---
+title: 'Assignment 3: T Tests'
+date: "3/5/2018"
+output: html_document
+---
+
+# The Current Population Survey
+In this assignment you will use linear regression to conduct some t-tests using data from the 2017 Current Population Survey (CPS). 
+The CPS is conducted by the US Bureau of Labor Statistics and the US Census Bureau.
+There is a monthly component, which is one source for our "monthly labor figures" that make the news each month.
+To collect these data, respondents are followed for four months, then have eight  months off, and are then followed for four months again. In this way, we can see the stability of work from month-to-month and from year-to-year for each individual.
+
+The data we will use are from something called the "March Supplement" to the CPS.  In March, respondents receive an extensive survey to collect a lot of their demographic information that does not change from month-to-month.
+
+
+I've provided a file that has every individual between the ages of 25 and 29, plus a few of the columns.
+Some of the columns are originals from the dataset, so you'll have to look at the codebook for them.
+For a few columns I've done the processing myself because it would be too much for this lab.
+
+
+## Load the packages and data
+This will load tidyverse, and then load in the data and create an object called `cps_raw`
+```{r}
+library(tidyverse)
+cps_raw <- read_csv('cps2017.csv')
+```
+
+A few of the columns are:
+
+ - H_SEQ: A household sequence number. A sort of id. People in the same household have the same H_SEQ.
+ - PF_SEQ: A Family sequence number. Households are made up of one of more families. Roommates will be separate families, but the same household.
+ - A_LINENO: The "Line Number" for each person. People in a household are numbered 1,2,3. etc. You can find unique individuals by combining the Household Sequence number. Other variable here use the line number to reference spouses and cohabiting partners. 
+ - A_SPOUSE: The line number to the person's spouse. '00' if unmarried. You'll have to look this up in the codebook.
+ - PE_COHAB: You'll have to look this up in the codebook.
+ - PERRP: The Person's relation to the householder. This contains information about non-married partners. You'll have to look this up in the codebook.
+ - A_SEX: The person's sex. You'll have to look this up in the codebook.
+ - EDUC: The person's number of years of education. I created this (from A_HGA), so you won't find it in the codebook.
+ - HISPANIC: 1 is Hispanic. 2 if not.
+ - RACE_R: The Person's race. I create this, so you won't find it in the codebook.
+ - A_AGE: The person's age.
+ - A_WKSTAST: Work Status. You'll have to look this up in the codebook.
+ - WSAL: Income from wages and salary last year.
+
+You can find the complete codebook on Canvas. You will have to download it for this lab.
+
+# The hypothesis
+You will test whether women ages 25-29 have the same income as men the same ages and create confidence intervals for the difference.
+
+We need to think carefully to make sure that we are comparing the same types of people. 
+In particular, it is common in American households for women to work less outside of the home than for men to do so.
+So we will look at just men and women who are not married.
+But marriage in the US is changing too, and more and more couples are choosing to remain unmarried, so we will also try to look at men and women who are not only not married, but are also not living with a partner. 
+Additionally, some people don't work full time, and so we should not compare the annual wages and salary of people who work full time with the annual wages and salary of people who do not. So there is a bit tidyverse cleaning ahead of us.
+
+ 
+# Data Cleaning
+Here are some data cleaning steps.
+In particular, we need to 
+
+ 1. Create a `factor` (categorical) variable out of Sex.
+ 2. Filter out people that are single.
+ 3. Filter out people who are not working full time.
+ 
+## Create a new factor variable for Sex.
+
+The A_SEX variable has 1's and 2's in it. Not categories of male and female.
+Look in the codebook on page 8-15. 
+You'll see that Males are '1' and Females are '2'. You'll have to do this on your own, so go ahead and look now, rather than just taking my word for it.
+I will just add this to the `cps_raw` data frame.
+
+```{r}
+ cps_raw <- cps_raw %>%
+     mutate(SEX = factor(A_SEX, levels = c('1','2'), labels = c('Male','Female')))
+```
+
+The `factor` function has arguments (col, levels, labels), the `col` is which column has the data we want to convert, the `levels` has what the original levels are, and the `labels` has what we want to call those levels. 1 will become 'Male' and 2 will become 'Female'.
+
+## Filter out married people
+
+Create a new data.frame `cps_single` that has filtered on people that are single. This requires looking at both the `A_SPOUSE` variable and the `PECOHAB` variable. 
+I've done the first for you, but you'll have to look up the second.
+Uncomment the code in this block and add the correct filter for `PECOHAB`. The codebook will tell what value means that there is no partner present.
+
+```{r}
+cps_single <- cps_raw %>%
+  filter(A_SPOUSE == '00') %>%
+  filter(PE_COHAB == '-1')
+```
+
+## Filter on people in their 20s
+
+Now create a new dataset `cps_single_20s` that filters away everyone not ages 25-29 (filter on people `>= 25` and '<30')
+
+```{r}
+cps_single_20s <- cps_single %>%
+  filter(A_AGE >= 25 & A_AGE < 30)
+```
+
+## Filter on people employed full time.
+
+Finally, create the final dataset `cps_final` that just has people employed full time.
+This uses the WKSTAT variable, but you'll have to look it up in the codebook.
+Only include those who are full time now.
+
+```{r}
+cps_final <- cps_single_20s  %>%
+ filter(A_WKSTAT == '2') 
+```
+
+
+```{r}
+dim(cps_final)
+```
+You're dataset should contain 3,475 individuals. If not, correct before continuing.
+
+
+
+# Data Visualization
+Before doing a t-test, you should check the distribution of the data with tables and charts:
+
+Create a table that summarizes the data by sex, calculating the min, median, mean, sd and max of the variable WSAL:
+```{r}
+cps_final %>%
+        group_by(SEX) %>%
+        summarize(min = min(WSAL),
+                  median = median(WSAL),
+                  mean = mean(WSAL),
+                  sd = sd(WSAL),
+                  max=max(WSAL),
+                  n=n())
+
+
+```
+
+## Draw a histogram of salary.
+
+I've decided to do this one for you.
+
+```{r}
+ggplot(data=cps_final, aes(x=WSAL/1000)) + geom_histogram() +
+  labs(x='Wages and Salary last year (Thousands of dollars)')
+
+```
+
+
+## Draw side-by-side boxplots of salary.
+
+
+```{r}
+#
+ggplot(data=cps_final, aes(x=SEX,y=WSAL)) + geom_boxplot() + 
+  labs(y='wages and salary last year')
+```
+The distribution is really right skewed.
+
+We'll talk more about transforms later this semester, but when data are right skewed like this, it is common to try a log-transform of the data.
+
+## Plot a log-transformed wage variable
+
+So let's plot a log histogram. But there are people with zero income last year (even though they are full time now.)
+Let's create a new variable that is Wages plus 1.
+
+
+
+
+```{r}
+cps_final <- cps_final %>%
+  mutate(LOG_WSAL = log(WSAL+1))
+cps_final
+```
+
+And plot that histogram using ggplot
+
+Potentially wrong
+```{r}
+ggplot(data=cps_final, aes(x=log(WSAL+1))) + geom_histogram() 
+
+
+```
+
+
+```{r}
+#
+ggplot(data=cps_final, aes(x=log(LOG_WSAL))) + geom_histogram() + 
+  labs(x='log of wages and salary last year')
+```
+
+And side-by-side boxplots of salary for both sexes:
+
+```{r}
+ggplot(data=cps_final, aes(x=SEX,y=LOG_WSAL)) + geom_boxplot() + 
+  labs(y='log of wages and salary last year')
+```
+
+That's a little more normal. Now there's a long left tail instead of right tail.
+
+I see at least two options for going forward:
+
+1. Use the original data. They're not normal, but maybe we can appeal to the Central Limit Theorem because the sample size is large.
+2. Go with the log-transformed data plus one. This is more normal, but it may be hard to explain what a logged variable is.
+
+A third option is to filter out everyone who didn't earn money last year. This is okay, but you have to recognize that we are now changing our population to peole who are employed this year and who earned some money last year. This might be justified, it is a population of people with relatively steady employment. We can even create a threshold, like people who made at leat $5,000 last year. It's a little arbitrary, but it could be justified.
+
+Even if you did that, you still might want to log transform.
+
+```{r}
+cps_final2 <- cps_final %>% filter(WSAL>5000)
+```
+
+
+```{r}
+ggplot(data=cps_final2, aes(x=SEX,y=LOG_WSAL)) + geom_boxplot() + 
+  labs(y='log of wages and salary last year (for people who earned > 5000)')
+```
+
+
+
+
+# Conducting t-tests
+
+### Question 1.
+Conduct a t-test for the difference in means between Males and Females using the (unlogged) wages and salary:
+```{r}
+model_WSAL <- lm(WSAL~SEX, data=cps_final2)
+summary(model_WSAL)
+```
+Explain what the estimate for the Intercept mean in this model.
+Interpret the p-value of the coefficient.
+
+Calculate a 95 percent confidence interval for the difference and explain what it means.
+```{r}
+confint(model_WSAL)
+```
+
+### Question 2
+Use linear regression to conduct a t-test for the difference in means between Males and Females using the (logged) wages and salary (I've done this one for you, but you'll have to uncomment it):
+
+```{r}
+model_WSAL2 <- lm(LOG_WSAL~SEX, data=cps_final2)
+summary(model_WSAL2)
+```
+
+Interpret the p-value of the coefficient.
+
+
+### Question 3
+Rather than thinking about differences in logs, it's possible to exponentiate the coefficients to "undo" the log. This number then represents the proportion of the average female's income to that of males. For example, a 0.9 would mean that the average woman earns 90% of the average man (10 % less than), and 1.05 would mean the average woman makes 105% (5 % more than) the salary of the average man.
+
+Transform the estimate into a multiplicative factor and explain the answer.
+I did this one for you, but you'll have to uncomment it.
+
+```{r}
+exp(-.1182)
+```
+
+Calculate a 95 percent confidence interval for the multiplicative factor:
+First, calculate the intervals on the log scale
+
+```{r}
+ exp(confint(model_WSAL2))
+```
+
+
+## T Test for differences in education.
+Women make about 85 percent to 93 percent of their male peers.
+Income is related to education. That's why you're all in school.  
+Perhaps women are less educated on average? 
+
+### Question 4
+
+Perform a t-test to compare the education levels of men and women in the `cps_final2` dataset.
+```{r}
+model_EDUC <- lm(EDUC~SEX, data=cps_final2)
+summary(model_EDUC)
+```
+
+Interpret the coefficients.
+Interpret the p-value and the coefficient. Evaluate whether the data support a hypothesis that women and mean have the same average education.
+
+
+## T Test for college-educated persons
+
+We can try to control for the effect of education by only looking at people with 16 years of education.
+Create a new dataset `cps_final_college` that takes `cps_final2` but keeps only those people with exactly 16 years of education.
+
+```{r}
+cps_final_college <- cps_final2 %>%
+  filter(EDUC == '16')
+```
+
+### Question 5
+
+Now repeat the t-tests for the unlogged and logged salary from this new dataset.
+
+- How big is this sample?
+- Interpret your p-values and calculate 95 percent confidence intervals for both cases.
+- Be sure to convert your results for logged income into a multiplicative factor.
+- Interpret your results to determine if they support the hypothesis that 20-something men and women with a college education and with stable jobs have the same average income.
+
+```{r}
+model_WSAL_college <- lm(WSAL~SEX, data=cps_final_college)
+summary(model_WSAL_college)
+```
+
+```{r}
+
+model_WSAL_college2 <- lm(LOG_WSAL~SEX, data=cps_final_college)
+summary(model_WSAL_college2)
+```
+```{r}
+#confint(model_WSAL_college2)
+exp(confint(model_WSAL_college2))
+
+```
+### Question 6
+
+
+Summarize your results.
+Assess whether you trust the findings:
+Do you think the effect is correct?
+If so, explain why the sample gives you confidence that you've found a true difference?
+If you think the results are too high or too low, Why? What else do you think might explain the difference in wages and salary between the men and women in our sample that is not accounted for?
+
+
+
+## Parting thoughts
+
+1. Working with data is iterative. I started this by thinking that I just needed to mutate and filter a few things. But as the analysis proceeded, problems cropped up that required me created new variables and new filters. This is not unusual. It's impossible to foresee every problem. But at each step, you need to think about how you are changing the data or subsetting the data, and decide how that changes the population you are studying and how you interpret your results.
+
+2. Controlling for factors is tedious with simple t-tests between means. Here, we have tried to control for marital status, age and education by picking subsets of data. But we've narrowed ourselves to such a sliver of the population that we can't say anything about general trends anymore. After the mid-term we'll do "multiple linear regression" which will us to control for many things all at once. 
+
+

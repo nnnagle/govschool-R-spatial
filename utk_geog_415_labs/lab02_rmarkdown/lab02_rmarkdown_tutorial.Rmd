@@ -1,0 +1,173 @@
+---
+title: "Mapping and Markdown Tutorial"
+author: "Nicholas Nagle"
+date: "9/5/2019"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+## Learning Objectives
+ - Practice a little bit of tidyverse and ggplot
+ - Create your first R markdown document
+ - Learn how to import and map shapefiles in R.
+
+## R Markdown helps
+
+- https://rmarkdown.rstudio.com/authoring_basics.html
+- https://www.rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf
+
+
+
+
+##
+The following R chunk loads the libraries that I will use. I tend to put them at the top of the markdown file so that other people can immediately see what the requirements are.
+
+- tidyverse: I always use tidyverse
+- sf: For working with shapefiles
+- ggspatial: useful for plotting spatial data: includes openstreetmap basemap
+
+
+```{r}
+library(tidyverse)
+library(sf)
+library(ggspatial)
+```
+## Load the data 
+
+Most data in geographic research seem to come in Microsoft Excel files (.xls), comma separated filed (.csv) or shapefiles (.shp).
+For microsoft excel files, I find it easiest to save them as comma separated files in excel first.
+
+For csv and shp files, the way to load them into R is basically the same. It should like something like this: `any_name_you_want <- read_csv('file.csv')` or 
+`any_name_you_want <- st_read('file.shp')`.
+The read_csv function is in the readr library (which is part of the tidyverse), and the st_read function is part of the sf library (which is not part of the tidyverse). There are packages for reading Excel files, but I recommend saving as csv first.
+
+Tip: When you type a directory and file path in R, you can use the tab button, and it will show you options to help complete the filename. Use this to avoid misspelling file names and folders.
+
+
+The data for this lab are a shapefile of census tracts for Knox County, with columns for total population, population between ages 18 and 21, median household income and median house price.
+
+
+Load the shapefile 'knox_acs.shp' into R. I gave it the name 'knox'. This assumes that you are running this file in the same place where you saved the shapefile. When the st_read function loads a shapefile, the R object it creates is called a  `sf` or "simple feature". It is a dataframe with extra information about the spatial coordinates.
+
+
+```{r}
+knox <- st_read('knox_acs.shp')
+```
+
+Click on the object `knox` in in the Environment window in the top right. It will open up the data in the top left. You will see the data columns. There is also a columns called "geometry". This column has the information necessary for mapping the data. You almost never want to change this column.
+
+## Create a choropleth map of the Median Household Population.
+
+Creating a choropleth is easy with ggplot. Technically, a choropleth is a polygon geometry, but there is a special function `geom_sf` for mapping with simple features. The most important aesthetic is the `fill` color. The `color` aesthetic is the border color of each polygon. It's probably not what you want.
+
+```{r}
+ggplot(knox) + 
+  geom_sf(aes(fill=MEDHHINC)) + 
+  labs(fill = "Median Household Income") 
+
+```
+
+## Removing the lat/long coordinates
+
+Most people aren't familiar enough to have the lat/long coordinates be meaningful, so they should be removed. I couldn't remember how to do that, but Googling "geom_sf" and "turn off axis labels" brought me to [this page](https://stackoverflow.com/questions/49836184/cant-remove-gridlines-when-plotting-with-geom-sf) which showed me the `coord_sf(datum=NA)` function.
+
+```{r}
+ggplot(knox) + 
+  geom_sf(aes(fill=MEDHHINC)) + 
+  labs(fill = "Median Household Income") +
+  coord_sf(datum=NA)
+```
+
+## Changing the color ramp
+
+The default color ramp is pretty lousy. I recommend always sticking to color palettes from [ColorBrewer](http://colorbrewer2.org/#type=sequential&scheme=Blues&n=3). They've been carefully chosen to have color that most people can easily distinguish.
+
+The way you change the scaling of any aesthetic in R is with a scale function. The function for changing the fill aesthetic using color brewer is `scale_fill_distiller`. The following chunk shows this.
+
+Ideally, you'd turn the continuous variable into discrete categories before drawing choropleth, but we'll save that for a later lab.
+
+Also, notice how I rescaled the variable by 10,000, and how I created a new line in the legend with "\n".
+
+```{r}
+ggplot(knox) + 
+  geom_sf(aes(fill=MEDHHINC/10000)) + 
+  scale_fill_distiller(palette='Blues')+
+  labs(fill = "Median Household Income\n($1000s)") +
+  coord_sf(datum=NA)
+```
+
+## Putting an open street map under your map
+
+Finally, it might be useful to pub a general purpose map under your map for reference. The `annotation_map_tile` function in the ggspatial package does that.
+
+Play with the alpha level to adjust the transparancy of your thematic map.
+
+Also notice that I want the basemap under my choropleth, so I listed the basemap layer before listing the geom_sf layer. Layers are drawn in the order in which they appear.
+
+
+```{r}
+ggplot(knox) + 
+  annotation_map_tile() +
+  geom_sf(aes(fill=MEDHHINC/10000), alpha=.7) + 
+  scale_fill_distiller(palette='Blues')+
+  labs(fill = "Median Household Income\n($1000s)") +
+  coord_sf(datum=NA)
+```
+
+A message saying "zoom: 9" is shown. It says what zoom level was selected for the basemap. You can safely ignore it. The annotation_map_tile()  is pretty good at picking an appropriate zoom level.
+
+
+## Calculating a correlation coefficient in R.
+
+The formula for correlation coefficient is `cor(x,y)`. It will calculate the correlation coeffience between variables x and y and return a single number. If there are missing data, it will return a missing value to. To ignore the missing data, the function is `cor(x, y, use = 'complete.obs')`.
+
+To calculate a correlation coefficient between Median House Value and Median Household Income, I will show how to do that two ways: first not using the tidyverse, and the second with the tidyverse.
+
+### Calculating the correlation coefficient the non-tidyverse way.
+
+The cor function can be used outside the tidyverse. It just needs two columns of data. The way to access a column of data outside the tidyverse is like so:
+`knox$MEDHHINC` and `knox$MEDHVALUE`. The formula is `data_frame$column_name`.
+
+```{r}
+corr_coef <- cor(knox$MEDHVALUE, knox$MEDHHINC, use='complete.obs')
+corr_coef # Just type the object to print it out.
+```
+
+
+If you want to use value in a sentence, you would do it like so: "`r corr_coef`".  Example, the correlation coefficient betweenm Median House Value and Median Household Income is `r corr_coef`.
+
+### Using correlation the tidyverse way
+
+The plan is to summarize the knox dataframe. This will create a new dataframe. I will call the new frame summary_stat. I will also calculate means and standard deviations while I'm at it.
+
+```{r}
+summary_stat <- knox %>%
+  summarize(mean_HHINC = mean(MEDHHINC, na.rm=TRUE),
+            sd_HHINC = sd(MEDHHINC, na.rm=TRUE),
+            mean_HVALUE = mean(MEDHVALUE, na.rm=TRUE),
+            sd_HVALUE = sd(MEDHVALUE, na.rm=TRUE),
+            cor_HVALUE_HHINC = cor(MEDHHINC, MEDHVALUE, use='complete.obs'))
+summary_stat # just the the dataframe to print it out.
+```
+
+In doing that, I saw that it also printed out a bunch of stuff about the map. We can delete that with the `df_spatial` function in the ggspatial package. The df_spatial function just takes a sf object and returns a clean (non-spatial) data frame.
+
+
+```{r}
+summary_stat <- knox %>%
+  df_spatial() %>%
+  summarize(mean_HHINC = mean(MEDHHINC, na.rm=TRUE),
+            sd_HHINC = sd(MEDHHINC, na.rm=TRUE),
+            mean_HVALUE = mean(MEDHVALUE, na.rm=TRUE),
+            sd_HVALUE = sd(MEDHVALUE, na.rm=TRUE),
+            cor_HVALUE_HHINC = cor(MEDHHINC, MEDHVALUE, use='complete.obs'))
+summary_stat # just type the dataframe to print it out.
+```
+
+
+If you want to use value in a sentence, you would do it like so: "`r summary_stat$cor_HVALUE_HHINC`".  Example, the correlation coefficient betweenm Median House Value and Median Household Income is `r summary_stat$cor_HVALUE_HHINC`.
+
+
+

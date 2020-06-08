@@ -1,0 +1,377 @@
+---
+title: "T Tests"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+# Introduction
+In this lab we will do a few t-tests and calculate confidence intervals with linear regressions.
+
+There are three main objectives in this lab:
+
+1. Learning to use `lm` and `t.test` functions to do t-tests in R.
+2. See an example that shows how important it is to think clearly about what hypothesis you are actually testing.
+3. Expand your tidyverse knowledge: convert data from "wide" format to "short" format (in Microsoft Excel, this is called a "pivot table"). 
+
+# Arbuthnot's data
+John Arbuthnot was an 18th century physician and an early demographer.
+This lab will use data he collected about the number of christenings in London, separated by the sex of the child.
+In the (Angligan) Church of England, Christening is the ceremony when a name is given to a child. Christening usually happens at the same time as baptism, usually within the first two weeks of a child's life.
+There were no public hospitals in the 18th century, and no official birth records, so church records were the best and most complete data that were available to Arbuthnot.
+
+Arbuthnot was interested in whether the number of male births was equal to the number of female births. 
+Stemming from a lack of adequate biological theory, and perhaps logic, Arbuthnot assumed that male births and female births should be equally likely. 
+But it was well known that male infants and young adults were more likely to die than females.
+He postulated that any deviation from 50:50 toward more males would be proof of divine providence, because it would mean that God was directing the birth of more males to account for their higher death rate.
+
+In modern parlance, we would say that Arbuthnot had a _scientific hypothesis_ to prove: God exists. The null hypothesis is God does not exist.
+He decided to measure the existence of God by measuring the ratio of male:female birts. His null _statistical hypothesis_ was that the ratio was 50:50. He recognized that there was some uncertainty and natural variation to this (although, Arbuthnot never probed the philosophical or religious significance of this natural variation), and thus wanted to account for the fact that an _observed_ ratio close to 50:50 may be consistent with a _true_ ratio of 50:50.
+
+## Preparing R and Loading the data
+We will be using the tidyverse package.
+```{r}
+library(tidyverse)
+```
+
+The data are provided in the file `arbuthnot.csv`. Let's read the data into R and print it to screen to inspect it.
+
+(Hint: if you're running this interactively, make sure that the "working directory" is set to the folder with the data file. In the Files Pane, use the button More -> Set as Working Directory)
+
+```{r}
+arbuthnot <- read_csv('arbuthnot.csv')
+arbuthnot
+```
+
+Currently, the data frame has one row per year.
+
+For the t-test, I will want one row per record.
+i.e. I want something like this:
+
+Year | Sex     | Christenings
+---  | ---     | ---
+1629 | Male    | 5218
+1629 | Female  | 4683
+1630 | Male    | 4858
+1631 | Female  | 4457
+
+I want to get one row per record.
+The data frame I want has the columns:
+
+ - Year
+ - Sex: Either Male or Female
+ - Christenings  
+
+I don't care about the columns for plague deaths or mortality.
+The information I need are in the columns `Year`, `Male` and `Female`.
+Basically, I want to put the Female column underneath the Male column, and to copy the year column.
+The current dataset is __wide__, the one I want is __long__.
+The tidyverse function for going from wide to long is called `pivot_longer`. (The opposite is `pivot_wider`. We won't use that in this lab.)
+
+The pivot_longer function looks like this:
+`pivot_longer(data, cols, names_to="name", values_to="value")`
+where cols are the colums in the wide data that need to be stacked, and names_to is what we want the new colum to look like.
+
+Here is how that looks:
+
+
+```{r, pivot-data}
+long_data <- arbuthnot  %>%
+    pivot_longer(Males:Females, names_to = "Sex", values_to = "Christenings")
+```
+
+Print that out and compare with the "before" data and try to understand how it changed.
+
+```{r, print_long_data}
+long_data
+```
+
+
+## Visualizing the data.
+
+We will create 1) a times series plot of the Christenings, and 2) boxplots of Christening.
+```{r}
+ggplot(long_data, aes(x = Year, y = Christenings,  color = Sex)) +
+    geom_line()
+```
+
+In every single year there are more male than female christenings. Arbuthnot saw this and thought that the chances of this happening every single year for 82 years was practically zero if the true ratio was 50:50. He compared it to flipping a coin and get Heads 82 times in a row.
+
+Let's also create a boxplot of the data.
+
+
+```{r}
+ggplot(long_data, aes(y = Christenings, x = Sex)) + 
+    geom_boxplot()
+```
+
+We can also represent these data with a table:
+```{r}
+long_data %>%
+  group_by(Sex) %>%
+  summarize(min = min(Christenings),
+            mean = mean(Christenings),
+            sd = sd(Christenings),
+            max = max(Christenings),
+            n = n())
+```
+
+Notice how large the sample sd is compared to the difference in means (5907 - 5534 = `r 5907-5534` )
+
+You can think of a t-test as comparing whether these two boxplots have the same center. It looks like there are more males, but the boxplots overlap a great deal and it's certainly plausible that they could just be sample variations of a single distribution. In a second we'll test that. 
+
+But first, compare the time series with the boxplot.
+When we look at the time series, we see that every single year, there are more Males than Females.
+Why is it obvious from the time series that there are more males, but much less obvious in the boxplots?
+
+
+Basically, when you see that there are obviously more males in the time trends, you are using the time information; your eye sees the vertical difference between the two lines.
+In contrast, the boxplots do not use the time information. It is helpful to think about where the variation (differences) in number of christenings come from. There is year-to-year variation, and there is within year male-to-female variation. __There is more variation from year to year than the difference between males and females.__ 
+
+The line chart helps us to see these two sources of variation, but the boxplots do not.
+
+
+We'd like to get rid of this year to year difference.
+If our eye sees the difference between the two lines, then we should quantify that.
+The easiest way to do that is to go back to the very first (wide) dataset, and calculate a difference: "Males-Females" or a ratio "Males/Females".
+If we use a difference, Arbuthnot's hypothesis would be a difference of zero.
+If we use a ratio, Arbuthnot's hypothesis would be a ratio of 1.
+
+```{r}
+arbuthnot <- arbuthnot %>% mutate(Difference = Males - Females, 
+                                  Ratio = Males / Females)
+```
+
+We can create a box plot of this Difference.
+
+```{r}
+ggplot(arbuthnot, aes(y = Difference, x = 'X')) + geom_boxplot() + 
+    scale_y_continuous(limits=c(0.0,1000))
+# I manually set the limits to make sure that the ratio of 1 was in the chart.
+```
+
+Visually, it is obvious that the difference is greater than zero. Here is the boxplot of the Ratio:
+
+
+```{r}
+ggplot(arbuthnot, aes(y = Ratio, x = 'X')) + geom_boxplot() + 
+    scale_y_continuous(limits=c(1.0,1.2))
+# I manually set the limits to make sure that the ratio of 1 was in the chart.
+```
+
+This boxplot of ratios never even goes down to 1.0, so we can obviously see that there are more Males than Females.
+
+Here are tables of summary statistics for the difference and Ratio:
+
+```{r}
+
+arbuthnot %>% summarize(min = min(Difference),
+                        mean = mean(Difference),
+                        sd = sd(Difference),
+                        max = max(Difference),
+                        n = n())
+arbuthnot %>% summarize(min = min(Ratio),
+                        mean = mean(Ratio),
+                        sd = sd(Ratio),
+                        max = max(Ratio),
+                        n = n())
+```
+
+## T Tests
+
+We have a bunch of ways that we can look at these data. Some of them will be helpful, other not. 
+(i) We have the mean for the Males and for the females, (the side-by-side boxplots) and we can use a t-test to compare them by testing whether the difference is 0.
+(ii) We have the calculated differences, and we can test whether the difference is 0.
+(iii) We have the calculated ratios, and we can test whether the difference is 1.0.
+
+
+Moreover, there are two-ways to do the t-test, one using linear regression, and one using the "one-sample and two-sample t-tests. Both ways give the same results, but I am not a fan of having to learn three different tools when one tool works just fine.
+
+I will cover both here, because the chances are high that if you ever have to interact with statisticians, that they will use all methods.
+
+
+
+### Case 1: A linear regression comparing the two groups
+The hypothesis we want to test is whether the difference between number of male births and female births (ignoring the year) is equal to zero.
+We can do this by regressing "Christenings" on the 0-1 variable "Sex."
+This is a dummy variable, as described in the textbook. So go ahead and look that over.
+
+
+The Regression model is:
+$$
+\mbox{(# of christenings)} = a + b \times I(\mbox{sex}==\mbox{'Male'}) + \mbox{error}
+$$
+
+The dummy variable is 1 if the record is Male, and 0 if Female.
+Thus, we can write the means as:
+
+$$ E[\mbox{christenings}] = a \quad \mbox{if Female}$$
+$$ E[\mbox{christenings}] = a + b \quad \mbox{if Male}$$
+
+The intercept $a$ measures the average number of Christenings for Females, and the slope $b$ measures the difference between number of Male and Female Christenings.
+
+The Null Hypothesis that we want to test is:
+$$
+H_0: b = 0
+$$
+The T-score for a dataset will be:
+$$
+T = \frac{\hat{b}-b}{\mbox{se}}
+$$
+
+$$
+T = \frac{\hat{b}}{\mbox{se}}
+$$
+
+because $b=0$ if the hypothesis is true. 
+
+
+Here is what that linear regression looks like in R.
+
+
+```{r}
+lm.model.1 <- lm(Christenings ~ 1+Sex, data=long_data)
+summary(lm.model.1)
+```
+
+Compare the intercept with the table above. The intercept is the same as the average number of Female christenings.
+
+
+The important number here is the Estimate of `SexMales`. This is the average number of more male than female christenings. On average, there are 372 more male christenings per year.
+
+The standard error of 253, is our uncertainty about this estimate. The standard error is related to the standard deviation of the boxplots, and the square root of the sample size. The boxplots have a very large standard deviation, so this standard error is fairly large too. The standard error would get smaller if we had much larger sammples.
+
+The T-score (with $b=0$ is already calculated for us, it is 1.47, and the p-value is .14.
+You should be able to verify that if you divide the estimate by the standard error, that you get T=1.47.
+We should not regard this sample difference as too unusual under the hypothesis that the true difference is zero.
+This sample does not privide evidence to reject the null hypothesis. 
+
+Summary, This did a regression that used a "dummy" variable to calculate the difference between men and women. It did not find a statistically significant difference.
+
+### Case 2: A regression to whether the Differences are 0.
+
+The next case looks at the precalculated differences.
+Here, we will use the simplest possible regression: an intercept but no slope.
+
+$$
+\mbox{Difference} = a + \mbox{error}
+$$
+
+Our hypothesis to test is
+$$ H_0: a=0$$
+
+
+This fits the regression model with an intercept:
+```{r}
+lm.model.2 <- lm(Difference ~ 1, data=arbuthnot)
+summary(lm.model.2)
+```
+
+Notice that the estimated difference, 372, is identical to with the two-sample t-test. But now the standard error is much, much smaller. The t-statistic is enormous (21.4) and we have overwhelming evidence that the data do not support a hypothesis of equal numbers (difference = 0) of births.
+
+
+
+### Case 3: A t-test for the mean of the ratios.
+
+We just did the t-test for the difference 
+We can do the t-test for the ratio too. 
+
+$$
+\mbox{Ratio} = a + \mbox{error}
+$$
+
+
+Our hypothesis to test is:
+$$ H_0: a=1$$
+
+NOTE: this change the proper t-statistic to use:
+Before we did $ Y - \frac{a-0}{\mbox{se}}$. Now we have to use $\frac{a-1}{\mbox{se}}$.
+
+The regression to fit this intercept only model is:
+```{r}
+lm.model.3 <- lm(Ratio ~ 1, data=arbuthnot)
+summary(lm.model.3)
+```
+
+Compare the intercept with the table, and you'll see that it is the mean ratio. But the t-statistic is wrong!!! Don't use it. Regression tables always assume that your t-statistic should be calculated using a hyopthesis value of 0. We need a hypothesis value of 1.
+
+The correct t-statistic to use is:
+
+
+```{r}
+T = (1.07 - 1) / .00345
+T
+```
+
+That T is outrageously large; we almost don't even need to calculate a p-value for it. But here is how you do that in R:
+
+```{r}
+pt(-20, 81)
+```
+
+That's the probability that T is less than -20. So the probability that it is less than -20 or greater than 20 is twice that. Twice outrageously small is still outrageously small. 
+We can confidently conclude that there are more males born each year than females.
+
+## Calculating confidence intervals in R
+
+
+And finally, suppose we want 90, 95, and 99 percent confidence intervals for the ratio.
+How do we do that in R?
+
+The easiest way is with the `confint` function. For example, the following block calculates 90 % confidence intervals for the ratio.
+
+```{r}
+confint(lm.model.3, level=.90)
+```
+
+
+
+## Using the t.test function.
+
+I encourage linear regression models, because, "Why learn three tools when one works". But most statistics classes teach "one-sample" t-test, then "two-sample" (in paired and unpaired versions) t-tests, and then "three-or more sample t-tests" (also called ANOVA), and then linear regression. That's a lot of redundant tools, and it's hard to keep it all straight. I don't think that you need to learn so many tools. But, even if you don't need to know how to use so many tools, you should know how to interpret them, because they are very common.
+
+### Case 2
+Here is a one-sample t-test for the Difference (Case 2).
+
+```{r}
+t.test(x=arbuthnot$Difference)
+```
+
+You should see the same t-score and p-value as you did with the regression.
+
+
+### Case 3
+Here is a one-sample t-test for the Ratio (Case 3).
+We have to tell it that we are testing a mean of 1 instead of 0. But again, you should see the same T-statistic that we calculated ourselves.
+
+```{r}
+t.test(x=arbuthnot$Ratio, mu=1)
+```
+
+### Case 1:
+
+The first case is called a "two-sample" t-statistic, because it compare the mean between the Male sample and Female Sample. To get the same result as regression, we have to specify that the variance of the two groups is approximately equal. The following code does that.
+
+```{r}
+t.test(x=arbuthnot$Females, y=arbuthnot$Males, data=arbuthnot, var.equal=TRUE)
+```
+
+```{r}
+t.test(x=arbuthnot$Females, y=arbuthnot$Males, data=arbuthnot, var.equal=TRUE, paired=TRUE)
+```
+
+
+## Summary
+The moral here is to make sure that the t-test between sample means is actually the correct thing to do.
+In this case, the t-test did compare the means, but it completely ignored the pairing of the data. 
+If we use the pairing and calculate a ratio, then a simple t-test is the right thing to do. And we got dramatically different results.
+Always look for opportunities to "pair" your data: pairing can be a powerful tool to eliminate other "non-interesting" differences. In this case, pairing removed the "non-interesting" year-to-year variations, which was very large and was overwhelming the difference between males and females.
+
+
+
+
+
+
+
+
+

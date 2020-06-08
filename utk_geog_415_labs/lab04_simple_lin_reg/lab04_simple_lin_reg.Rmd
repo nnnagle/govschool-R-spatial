@@ -1,0 +1,258 @@
+---
+title: "Lab 4: Simple Linear Regression"
+author: "Nicholas Nagle"
+date: "10/18/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+# Introduction
+
+The movie *Moneyball* focuses on the "quest for the secret of success in baseball". 
+The film stars Brad Pitt (who won a bunch of awards) as the the manager of the low-budget team, the Oakland Athletics, in the early 2000’s. Brad meets a statistician (played by Jonah Hall), who believes that underused statistics, such as a player’s ability to get on base, actually better predict the ability to score runs than typical statistics like homeruns, RBIs (runs batted in), and batting average. 
+Obtaining players who excelled in these underused statistics turned out to be much more affordable for the team.
+In this lab we’ll be looking at data from all 30 Major League Baseball teams and examining the linear relationship between runs scored in a season and a number of other player statistics. Our aim will be to summarize these relationships both graphically and numerically in order to find which variable, if any, best helps us predict a team’s runs scored in a season.
+
+Let’s load up the batting data for the 2009 season, as well as a function that we'll use later to visualise the sum of square errors.
+
+```{r}
+mlb = read.csv("data/mlb09.csv")
+source('plot_ss.R')
+
+```
+
+In addition to runs scored, there are seven traditionally-used variables in the data set: at-bats, hits, homeruns, batting average, strikeouts, walks and stolen bases. The last three variables in the data set are newer: on-base percentage, slugging percentage, and on base plus slugging.
+
+## Exercise 1
+
+Plot `runs` as the response variable and `at_bats` as the explanatory variable. Does the relationship look linear? If you knew a team’s at-bats, would you feel confident in your ability to make a good prediction of their runs?
+
+
+
+```{r}
+ggplot(data=mlb, aes(x=at_bats, y=runs)) + geom_point()
+```
+
+ANSWER:
+
+
+# Sum of Square Errors
+Besides correlation, another way to summarize the relationship between these two variables is finding the line that best follows their association.
+
+The next activity won't work in R markdown, so you'll have to copy and paste the code to the Console and run it there.
+
+Use this code to run an interactive function:
+
+`plot_ss(x = mlb$at_bats, y = mlb$runs)`
+
+If it doesn't work, make sure that you run the first chunk to both load the data `mlb` and to load the function `plot_ss`
+
+After you run this command, you’ll be prompted to click two points on the plot to define a line. Once you’ve done that, it will plot the line in black and the residuals in red. The blue boxes represent the squared residuals. The area of all the boxes is the sum of squared residuals for the line you've created.
+
+You’ll recall that the most common way to do linear regression is to select the line that minimizes the sum of squared residuals, where a residual is defined as the difference between the observed y-value and the predicted y-value, $y − \hat{y}$. Note that the output from plot_ss() provides you with the slope and intercept of your line as well as the sum of squares.
+
+
+## Exercise 2
+
+Using `plot_ss()`, choose a line that does the best job of minimizing the sum of squares. Run the function several times to get the lowest possible value. What is that value? How does it compare to your neighbors?
+
+ANSWER:
+
+
+
+# The linear model.
+
+It is cumbersome to try to get the correct least squares line, i.e. the line that minimizes the sum of squared residuals, through trial and error. Instead we can use one of the built in functions in R, `lm` (stands for "linear model") to fit the regression line.
+
+We've used the `lm` function a few times in previous labs to fit a linear regression.
+The following code runs a regression of the `runs ` variable on the `at_bats` variable, and saves it as an object with the names `m1` (I picked the name to abbreviate model 1).
+
+`m1 <- lm(runs ~ at_bats, data = mlb)`
+
+The first argument in the function `lm` takes the form y~x, or response~explanatory. 
+We want to make a linear model of runs as a linear function of at bats. 
+The second argument specifies that R should look in the mlb dataset to find these variables.
+The output of lm() is an object that contains all of the information we need about the linear model that was just fit. We can pull up the basic information with summary
+
+`summary(m1)`
+
+
+
+Create a code block and paste these two commands into it.
+
+```{r}
+#
+```
+
+
+At the top of the output is the formula that you specified, runs as a function of at-bats. 
+Below that is a table that contains summary statistics on the residuals and below that is the regression output. 
+The coefficient estimate of the intercept is shown in the first row, next to `(Intercept)`, and the estimate of the slope is shown in the second line, next to `at_bats`. 
+How do these compare to your model from Exercise 2. 
+Standard errors, t-statistics, and p-values testing whether each coefficient is significantly different from 0 are also given.
+At the bottomr of the output are summaries of the regression: the standard error (i.e. standard deviation) of the residual, two versions of the R-squared, and something called the F-statistic, and it's p-value.
+The R-squared that we'll use for now is the first one ("multiple R-squared"). We'll use the Adjusted R-squared in later labs.
+
+## Exercise 3
+Using the estimates from the R output, write the equation of the regression line for predicting runs from at-bats. 
+Interpret the slope coefficient. What is a 95 percent confidence interval for the slope?  Is the slope significantly different from 0? How do you know?
+
+
+ANSWER:
+
+
+
+# Prediction
+Let’s overlay the regression line on the scatterplot of runs vs. at-bats.
+
+With ggplot, use `geom_point` to create a scatterplot of runs vs at-bats.
+Add the following layer to draw a line 
+` + geom_abline(intercept=????, slope=????)`
+where you use the estimated intercept and slope.
+
+
+```{r, eval=FALSE}
+ggplot(data=mlb, aes(x=????, y=????)) + geom_point() +
+  geom_abline(intercept=????, slope=????)
+
+```
+
+
+
+There are two useful functions to return predicted values $\hat{y}$.
+
+ - `predict()` gives you a list of numbers. They are in the same order as your original data.
+ - The `augment()` function in the broom package wraps those predictions in to a nice data table with the original data.
+
+```{r}
+predict(m1)
+```
+
+```{r}
+mlb_aug <- broom::augment(m1)
+mlb_aug
+```
+
+
+## Exercise 4
+If a team manager saw the least squares regression line and not the actual data, how many runs would he or she predict for a team that had 5,493 at-bats? The San Francisco Giants (my childhood team) had 5,493 at-bats... is the prediction based on the model an overestimate or an 
+underestimate, and by how much?
+
+
+ANSWER:
+
+
+
+## Exercise 5
+Plot the actual values against the predicted values. Informally, does the model appear to be doing a good job?
+
+ANSWER:
+
+```{r}
+#
+```
+
+
+
+The following code uses the mlb_aug data, summarizes it by calculating the correlation coefficient between the fitted runs and the actual runs, and then creates a new column that squares the correlation.
+Compare the correlation, correlation squared, and the R-squared from the summary table you printed earlier.
+
+```{r}
+mlb_aug %>% summarize(r=cor(.fitted, runs)) %>% mutate(r2 = r^2)
+```
+
+
+In addition to getting predictions for the data, you can make predictions for new data.
+First, create a new table with the explanatory variable you want to predict for:
+
+`pred_x <- tibble(at_bats = c(5500, 6000))`
+
+
+To get interval estimates instead of just point estimates, we include the `interval=` argument.
+There are two types of intervals: confidence intervals for the line and prediction intervals for the data points.
+You can generate confidence intervals and prediction intervals for all the data points with the following chunk.
+
+```{r}
+pred_x <- tibble(at_bats = c(5500, 6000))
+conf_int <- predict(m1, newdata=pred_x, interval='confidence')
+pred_int <- predict(m1, newdata=pred_x, interval='prediction')
+```
+
+The output of the predict function with the interval= argument includes the first column, fit, which gives the predicted (or "fitted" values), and then the next two columns give the lower and upper bounds of the interval estimate (confidence or prediction, depending on which you specify).
+The default level of confidence is 95%.
+
+## Plot the confidence intervals.
+
+Suppose we want to plot confidence intervals for the regression line and prediction intervals for the data.
+In ggplot, confidence intervals are easy, there is a geom_smooth() function that includes confidence intervals. But I didn't remember how to do predictions intervals for the points. A google search for 'ggplot confidence prediction interval' eventually brought me here: https://rpubs.com/Bio-Geek/71339
+
+After modifying it a bit, I came up with the following code block.
+First, I calculate predictions interavals for each data point.
+Then, I bind those predictions intervals as new columns (cbind) of the oritinal data frame.
+
+Then, in ggplot, I add a layer for the points, a layer for the lower (lwr) prediction interval, a layer for the upper (upr) prediction interval, and add a layer for the regression line with `geom_smooth(method=lm)`.  Adding `se=TRUE` adds the confidence interval.
+
+```{r}
+temp_var <- predict(m1, interval="prediction")
+new_df <- cbind(mlb, temp_var)
+
+ggplot(new_df, aes(at_bats, runs))+
+    geom_point() +
+    geom_line(aes(y=lwr), color = "red", linetype = "dashed")+
+    geom_line(aes(y=upr), color = "red", linetype = "dashed")+
+    geom_smooth(method=lm, se=TRUE)
+```
+
+
+
+
+## Exercise 6
+
+Create a confidence and prediction interval for the number of runs for a team with 5400 at-bats, and interpret both intervals.
+
+ANSWER:
+
+
+
+# Model Diagnostics
+
+In order to check if the conditions for a linear regression are met we should check for (1) linearity, (2) equal variance, and (3) nearly normal residuals. The residuals are already calculated for you in the `mlb_aug` object. The `augment()` function does that for you.
+
+## Exercise 7
+Do the three conditions appear to be met? Use `geom_point()` to create a scatterplot of residuals vs explanatory variable, and use `geom_histogram()` to create a histogram of residuals. You'll have to adjust the number of bins in the histogram because it's a small dataset.
+
+ANSWER:
+
+```{r}
+#
+```
+
+
+
+# Exploring other variables
+
+## Exercise 8
+Now that you can summarize the linear relationship between two variables, investigate the relationships between runs and all other traditional variables, one at a time (no need to show each investigation, only the best one). Which variable best predicts runs?
+
+ANSWER:
+
+
+## Exercise 9
+Now examine the three newer variables. These are the statistics used in *Moneyball* to predict a team’s success. In general, are they more or less effective at predicting runs than the old variables? Explain using appropriate graphical and numerical evidence. Of all ten variables we’ve analyzed, which seems to be the best predictor of runs? Using the limited (or not so limited) information you know about these baseball statistics, does your result make sense? If you think you don’t know enough about baseball to answer this question, ask around. There’s surely someone in class who does.
+
+ANSWER:
+
+
+## Exercise 10
+Feedback: Was this example helpful? I usually try to pick interesting topics, and sports just isn't interesting to me, and I get irritated by statistics textbooks that try to be culturally relevant or cool by including examples from sports (no... why aren't examples about social inequality or climate change relevant?). But this example allows you to run a bunch of regressions really quickly and doesn't require too much thought about science outside of the statistics. Let me know what you think. Was it helpful? Do you have a better grasp of regression now? Was it dull (compared to usual)?
+
+ANSWER:
+
+
+
+
+

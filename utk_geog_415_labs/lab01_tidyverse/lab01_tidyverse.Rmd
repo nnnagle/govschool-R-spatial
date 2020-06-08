@@ -1,0 +1,496 @@
+---
+title: "Tidyverse Tutorial"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+#source('geog415_load_packages.R')
+library(learnr)
+library(gapminder)
+library(tidyverse)
+library(timetk) # For tk_tbl()
+library(gradethis)
+tutorial_options(exercise.checker = grade_learnr)
+#library(checkr)
+#tutorial_options(exercise.checker = checkr::check_for_learnr)
+knitr::opts_chunk$set(echo = FALSE)
+
+top_10 <- c("United States", "United Kingdom", "Germany", "France", 
+            "Japan", "Italy", "China", "India", "Canada", "Brazil")
+```
+
+## Introduction
+This tutorial is your introduction to R.
+Just as a chemist must learn to use a pipette, you must learn how to work with data, and R is one of the most flexible and easy-to-learn tools out there.
+R is a very large computer progam. 
+Think of it as a very large apartment building, with each type of scientist having their own room.
+Chances are high that you will never go into most of the rooms, but eventually, you will learn your room so well that you can get around your own room blindfolded. 
+
+R is free, but there is a company called RStudio that produces a lot helpful things for R, including a program called R Studio that makes it much easier to use R.
+For this lab, we will use Rstudio in a web browser.
+Later, you will learn to use R on your own computer or on a UT computer.
+
+If R is an apartment building, then the fancy lobby that everyone uses when they first walk in the building is something called the "tidyverse."
+The tidyverse is for loading data, processing data, cleaning data, and generating tables and charts that you will use to show other people your science.
+
+The purpose of this lab is to begin learning your way around the tidyverse.
+I don't promise that you'll get it right away. It may feel like you are being sprayed with a firehose. Don't worry, you'll get used to it.
+
+This lab follows a webinar developed by the Rstudio.com. 
+The actual webinar is 1 hour long, but there's only about 30 minutes of it that are good. I encourage you to watch it are home (or with earplugs not at home).
+
+This tutorial is interactive. It will tell you when to watch a part of the video, and then there will be sections in this tutorial where you can try things out using R.
+
+
+## The data
+
+In this tutorial, you will use data from *gapminder*.
+Gapminder is a non-profit that promotes sustainable development by increased understanding of statistics about social, economic and environmental development.
+The founder is Hans Rosling, and there is a good chance that you have seen one of his TED talks.
+
+> The complete gapminder data would be a good candidate for your final poster project (but not this tiny sample here)
+
+Going beyond the class: If you want to learn more about Gapminder, you might watch this TED talk -- [How not to be ignorant about the world](https://www.gapminder.org/ignorance/)
+
+## Introduction
+If you can, open the [webinar](https://www.rstudio.com/resources/webinars/tidyverse-visualization-and-manipulation-basics/) in a separate window and watch the first 3 minutes.
+After you watched the first three minutes, come back to this window and answer the question to continue.
+
+According to the video, data Science contains the elements:
+
+1. Form Hypothesis
+2. Collect Data
+3. Explore or Test Data
+4. Communicate Results
+5. Repeat
+
+
+## Tidy Tools
+The tidyverse is really great. It provides tools to import your data into R, to manimpuate your data so that it is easier to analyze, to visualize your data, and even to help your write your paper in the way that Microsoft Word helps you to write a paper. But R can not help you get the right answer. There is no substitute for critical thinking.
+
+```{r intro-mc, echo=FALSE}
+question("Which of following can the tidyverse help you to do? Choose all that apply",
+         answer("Import Data", correct = TRUE),
+         answer("Visualize the data and results", correct=TRUE),
+         answer("Generate the correct answer for your research question"),
+         answer("Write your paper", correct=TRUE),
+         incorrect = "The tidyverse can help you to import data, visualize the data, and even to write your paper. No software can even help you to generate the correct answer to a question. You have to to that")
+```
+
+If you are watching the video, skip ahead to the 15:21 mark. There should be a green screen called "Tidy tools". You'll watch until the 37:50 mark (the green screen labelled "Grammar of Graphics").
+You may want to go back and forth between the video and this page to do the exercises.
+
+### Functions
+
+In R, you manipulate data by passing the data to functions.
+For example, the `round` function rounds a number.
+You can even choose how many decimal places to round to.
+
+```{r ex2, exercise = TRUE}
+round(1234.567, digits = 2)
+
+```
+
+A function has inputs and outputs. As a flowchart, you might think of it like: 
+input -> function -> output.
+In R, we might write it like `output <- function(input)`. This takes an input dataset, feeds it through the the function, and the saves the output to a new dataset called output.
+By default, if you fail to give the output, then outputs is printed to the screen without saving.
+so `function(input)` will print something to screen.
+Inputs are also called __arguments__.
+The round() function has two arguments.
+The first argument "1234.567" is the number to be rounded.
+The second argument has a name "digits" and its value is "2".
+
+
+Modify the code below by changing the number of digits to 1.
+```{r ex2_1, exercise=TRUE}
+round(1234.567, digits=2)
+```
+
+```{r ex2_1-solution}
+round(1234.567, digits=1)
+```
+
+
+
+Some arguments are mandatory and some are optional. 
+The `round` function must have the first argument, which is the number to round.
+The `digits` argument is optional, though. 
+Modify the code again by deleting the second argument (and the comma) and see what happens.
+
+```{r ex2_2, exercise=TRUE}
+round(1234.567, digits=2)
+```
+
+```{r ex2_2-solution}
+round(1234.567)
+```
+
+```{r ex2_2-check, context='setup'}
+grader:::check_result(
+  results(
+    result(1235, "good job", correct=TRUE)
+  )
+)
+```
+
+### Load the Tidyverse
+
+As I mentioned at the beginning, a lot of the useful stuff in R is in a group of functions called the "tidyverse". You need to load the tidyverse from R's library like so:
+
+```{r ex3, exercise = TRUE}
+## install.packages("tidyverse")
+library("tidyverse")
+```
+
+
+Tidyverse functions are designed to be:
+
+1. **Simple** - They do one thing and they do it  well
+2. **Composable** - They can be combined with other functions for multi-step operations. (Literally, you can compose things with them, like a composer.)
+
+## arrange()
+
+The `arrange` function is the equivalent of sorting from low to high or high to low.
+In a data frame, you can sort based on any column. For example, you might sort of list of products on Amazon by price, or by popularity, or by date.
+
+If you're watching the webinar, this begins at around the 16:58 mark.
+
+Arrange in ascending order:
+```{r out.width = "95%", echo = FALSE}
+knitr::include_graphics("images/arrange.png")
+```
+
+Arrange in descending order:
+```{r out.width = "95%", echo = FALSE}
+knitr::include_graphics("images/desc.png")
+```
+
+Suppose we want to know which countries have the largest population. We can do that with the gapminder dataset.
+The arrange function needs two arguments: (1) the dataset to arrange, and (2) which column to arrange on.
+The gapminder dataset has a column called `pop` that we can arrange on.
+For example, to sort by population, you could start with `arrange(gapminder, pop)`.
+By default, this will sort from low to high. If we want to sort in *descending* order from high to low, we would type `arrange(gapminder, desc(pop))`. Try typing both versions in the box below to see what happens. 
+
+```{r ex4, exercise = TRUE, exercise.eval = TRUE}
+gapminder
+```
+
+```{r ex4-solution}
+arrange(gapminder, desc(pop))
+```
+
+## filter()
+Hopefully you noticed that the gapminder has many years for each country.
+Thus, we've sorted our list, but the top rows are all China. We probably want to just sort on the most recent year in the data, 2007. 
+The filter command is used to keep just a certain number of rows that match a criterion. For example, we want to extract rows where year == 2007.
+
+In the video, this begins at about the 18:50 mark.
+
+```{r out.width = "95%", echo = FALSE}
+knitr::include_graphics("images/filter.png")
+```
+
+The filter function takes two arguments also, the first is the dataset, and the second is a 'logical' statement, which is something that returns a TRUE or a FALSE for each row. For example, `year==2007` returns a TRUE if the year equals 2007, and a FALSE if not. Notice that it is `==`, not `=`.
+So we could filter using `filter(gapminder, year==2007)`
+
+The code below should filter the gapminder dataset on year==2007, save that into a new dataset called 2007, and then print out after sorting it. Fill in the missing blanks to correct it.
+
+```{r ex5, exercise = TRUE, exercise.eval = FALSE}
+gapminder2007 <- filter(gapminder, ....)
+arrange(...,desc(pop))
+```
+
+```{r ex5-solution}
+gapminder2007 <- filter(gapminder, year == 2007)
+arrange(gapminder2007, desc(pop))
+```
+
+If you compare the result with the previous page, you should notice that the result has a lot fewer rows, and that these are the rows where year equals 2007. Everything else has been eliminated.
+
+We now have to saved objects: gapminder and gapminder2007.
+
+
+```{r sorted-questions, echo=FALSE}
+question("Is the gapminder2007 dataset sorted by descending population?",
+         answer("Yes", correct = FALSE),
+         answer("No", correct=TRUE),
+         incorrect = "gapminder2007 is not sorted. When we sorted, we just printed it out to screen. We did not save the result. Go ahead and type `gapminder2007` and click run in the above code block to see for yourself. It is actually sorted alphabetically, but that wasn't something we did.")
+```
+
+## Pipes: A better way
+We've written functions like this: output <- function(input).
+Most computer languages do it this way.
+But there is a another way that most people find easier to read. 
+We read from left to right, so we might prefer to read the code this way:
+input -> function -> output.
+In computer science, this is called a 'pipe'.
+The way to write that in R is like so:
+input %>% function -> output.
+That is a valid syntax in R, but this is definitely more common:
+output <- input %>% function.
+
+
+
+
+
+In the video, this begins at about the 21:30 mark.
+
+For example, we can rewrite the previous filter code as:
+`gapminder2007 <- gapminder %>% filter(year==2007)`
+and the code to sort and print as:
+`gapminder2007 %>% arrange(desc(pop))`
+
+The beauty of piping is that you can connect pipes just like a plumber: for example you can do both the filter and arrange steps at once, like so:
+`gapminder %>% filter(year==2007) %>% arrange(desc(pop))`
+When you read this from left to right, hopefully it makes sense:
+"Take the gapminder dataset, filter just the rows where year == 2007, and then arrange in descending order by pop. We don't have an assignment (no -> or <-), so a new dataset is not created. The result will just print to screen.
+
+Change the code below to use the pipe.
+
+```{r ex6, exercise = TRUE, exercise.eval = TRUE}
+gapminder2007 <- filter(gapminder, year == 2007)
+arrange(gapminder2007, desc(pop))
+```
+
+```{r ex6-solution}
+gapminder %>% 
+  filter(year == 2007) %>% 
+  arrange(desc(pop))
+```
+
+```{r gapminder-questions, echo=FALSE}
+question("In the following code: `gapminder %>% filter(year==2007) %>% arrange(desc(pop))`, has the gapminder dataset been permanently altered?",
+         answer("Yes", correct = FALSE),
+         answer("No", correct=TRUE),
+         incorrect = "The gapminder dataset is unchanged. When we filtered and sorted, we just printed it out to screen. We did not save the result. Go ahead and type `gapminder` and click run in the above code block to see for yourself.")
+```
+
+## select()
+If filter extracts certain rows, then `select` extracts certain columns. Usually, we just name certain columns to keep. In a dataset with hundreds of columns, it usually makes sense to print out just a few columns.
+
+In the video, this begins at about the 24:08 mark.
+
+
+```{r out.width = "95%", echo = FALSE}
+knitr::include_graphics("images/select.png")
+```
+
+The general framework for selecting columns by name is:
+`select(dataset, col1, col2, col3, etc)`
+or, using the pipe form,
+`dataset %>% select(col1, col2, col3, etc)`
+
+Modify the code from the previous block to (1) filter on `year==2007`, (2) arrange on `desc(gdpPercap)`, and select the columns `country` and `gdpPercap`
+
+
+```{r ex7, exercise = TRUE, exercise.eval = TRUE}
+gapminder
+```
+
+```{r ex7-solution}
+gapminder %>% 
+  filter(year == 2007) %>% 
+  arrange(desc(gdpPercap)) %>% 
+  select(country, gdpPercap)
+```
+
+In 2007, which country has the highest wealth per person? Where is the United State on the list?
+
+## mutate()
+You know how to sort (arrange), extract rows (filter) and extract columns (select). Next is to create a new column. This is the mutate function.
+
+This begins at about the 25:42 mark.
+
+```{r out.width = "95%", echo = FALSE}
+knitr::include_graphics("images/mutate.png")
+```
+
+Suppose we want to create the total gdp of a country. This is one of many ways to measure of its economic strength. The gapminder data has gdp per capita (gdpPercap) and population (pop). The definition of gdp per capita is:
+$$\frac{\mbox{gdp}}{\mbox{population}} = \mbox{gdp per capita}$$
+
+Doing the most basic algebra, we can figure out that
+$$ \mbox{gdp} = (\mbox{population}) \times (\mbox{gdp per capita})$$
+The University of Tennessee expect you to be able to do this level of basic algebra.
+
+So, if we want to create a new column with the gdp, we could do it like so:
+`mutate(gapminder, gdp = pop * gdpPercap)`
+What that does is take the `pop` column, multiply it by the `gdpPercap` column, and save that as a new column called `gdp`. We can choose what the new column is to be called, but everything on the right side of the '=' must be a column in our dataset.
+
+In the pipe framework, that would be:
+`gapminder %>% mutate(gdp = pop * gdpPerCap)`
+
+Go ahead and modify the code below and run it to see the result.
+
+```{r ex8, exercise = TRUE, exercise.eval = TRUE}
+gapminder
+```
+
+```{r ex8-solution}
+gapminder %>% 
+  mutate(gdp = pop * gdpPercap)
+```
+
+
+## summarize()
+You can now manipulate rows and columns of a data. But suppose that you want to summarize your dataset, for example, by saying what is the average gdp, or what country has the highest gdp? or the lowest?
+The `summarize()` command does that. (Fun fact, the tidyverse is diverse, so if you speak with an English or Australian accent, you can use `summarise()` as well.) 
+
+In the video, this begins at around the 28:08 mark.
+
+```{r out.width = "95%", echo = FALSE}
+knitr::include_graphics("images/summarise.png")
+```
+
+The summarise function looks like the mutate function, only instead of creating a new column for every row, the summarise function returns a new 1-row dataset, with a new column that summarized that dataset.
+For example, if you want to find the country with the maximum gdp, that would look like:
+`summarize(gapminder, max_gdp = max(gdp))`
+This creates a new column called 'max_gdp', and it is calculated as the maximum of the gdp column.
+You can create a whole bunch of summaries like so:
+`summarize(gapminder, max_gdp = max(gdp), min_gdp = min(gdp), mean_gdp = mean(gdp))`
+Useful summary functions include: `max`, `min`, `mean`, `median`, `first`, `last`, `var`, `sd`.
+We'll cover `var`iance and `s`tandard `d`eviation in a few weeks. And usually, `first` and `last` only make sense if your data are in a particular order (like if they are ordered by date and your want the earliest record or the most recent record). 
+
+
+Modify the following block to summarize the gapminder data by maximum gdp.
+
+```{r ex9, exercise = TRUE, exercise.eval = TRUE}
+gapminder %>% 
+  mutate(gdp = pop * gdpPercap)
+```
+
+```{r ex9-solution}
+gapminder %>% 
+  mutate(gdp = pop * gdpPercap) %>% 
+  summarize(max_gdp = max(gdp))
+```
+
+
+
+## group_by()
+The last of the tidyverse verbs we'll cover here is group_by. Summarizing data by group is extraordinarily useful. Suppose that we want a new dataset, with one row per country, and a column for the first gdp and the ending gdp. To do this, we would (1) group the dataset by country, (2) arrange by year, and then (3) summarize each country by the first and last value. Summarizing almost 200 countries would get tedious, but the tidyverse allows us to do all of them at once.
+
+```{r out.width = "95%", echo = FALSE}
+knitr::include_graphics("images/group_by.png")
+```
+
+Modify the code below to group by the column called `country` before summarizing.
+
+```{r ex11, exercise = TRUE, exercise.eval = FALSE}
+gapminder %>% 
+  mutate(gdp = pop * gdpPercap) %>% 
+  group_by(....) %>%
+  arrange(...) %>%
+  summarize(first_gdp = first(gdp), last_gdp = last(gdp))
+```
+
+```{r ex11-solution}
+gapminder %>% 
+  mutate(gdp = pop * gdpPercap) %>% 
+  group_by(country) %>% 
+  arrange(year) %>%
+  summarise(first_gdp = first(gdp), last_gdp = last(gdp))
+```
+
+### Find the countries with the most rapid economic growth between 1952 and 2007?
+Having these 6 verbs - arrange, filter, select, mutate, group_by, and summarize - you can do an enormous amount of things.
+For example, suppose that you want to find out which countries had the most rapid economic growth between 1952 and 1957. 
+One measure for growth could be the "cumulative annual growth rate". We don't have annual growth, but this approximates what the annual growth rate would have to be to get from the beginning to the end.
+
+On the video, this begins at around the 30:00 mark.
+
+The formula for cumulative annual growth rate is (you don't have to remember this at all, I'm just telling you):
+$$100\Big(\frac{\mbox{end value}}{\mbox{start value}}\Big)^{\frac{1}{\mbox{\tiny number of years}}}-1$$
+
+To do this, we need to do a bunch of things to the gapminder data:
+
+1. calculate gdp (using `mutate(gdp = pop * gdpPercap)`)
+2. group by country (using `group_by(country)`)
+3. for each group, sort the years so 1952 is first and 2007 is last (using `arrange(year)`)
+4. summarize by gdp in 1952 and 2007 (using `summarize(gdp1952 = first(gdp), gdp2007 = last(gdp))`)
+5. calculate cumulative annual growth rate (using `mutate(cagr = ((gdp2007 / gdp1952) ^ (1/55) - 1) * 100)s`)
+6. sort by annaul growth rate (using `arrange(cagr)`)
+7. Maybe clean of the output be just selecting the country and the growth rate (by using `select(country, cagr)`)
+
+Modify the following code to do all of that...
+```{r ex12, exercise = TRUE, exercise.eval = TRUE}
+gapminder %>% 
+  mutate(gdp = pop * gdpPercap) %>% 
+  group_by(country) %>% 
+  summarise(gdp1952 = first(gdp), gdp2007 = last(gdp))
+```
+
+```{r ex12-solution}
+gapminder %>% 
+  mutate(gdp = pop * gdpPercap) %>% 
+  group_by(country) %>% 
+  arrange(year) %>%
+  summarise(gdp1952 = first(gdp), gdp2007 = last(gdp)) %>% 
+  mutate(cagr = ((gdp2007 / gdp1952) ^ (1/55) - 1) * 100) %>% 
+  arrange(desc(cagr)) %>% 
+  select(country, cagr)
+```
+
+For the record, an annual growth rate of 8% per year, for 55 years, is absolutely staggering. We see a list of countries including southeast and east Asia, and some oil-dependent countries (like Equatorial Guinea, Oman, and Libya).
+
+
+
+## Review Quiz:
+
+The CO2 record observed at the top of Mauna Loa in Hawaii is one of the most important climate change datasets in the world because it is high enough in the atmosphere to be relatively unaffected by most surface processes, and it is so far away from major industrial locations on the planet that we can assume it represents global levels of CO2, and not local levels. The records easily shows a increase in atmospheric CO2 over the last century.
+
+
+
+```{r co2_plot, eval=TRUE, echo=FALSE, message=FALSE}
+  tk_tbl(co2, preserve_index=TRUE) %>% separate(index, into=c('month','year'),remove = FALSE) %>% ggplot(aes(x=index, y=value)) + geom_line() + labs(x='Years (CE)',y='CO2 (ppm)')
+```
+
+Here is the top of the data
+```{r co2_head,  eval=TRUE,echo=FALSE}
+tk_tbl(co2, preserve_index=TRUE) %>% separate(index, into=c('month','year'),remove = TRUE) 
+```
+
+
+```{r review1, echo=FALSE}
+question("There is a strong seasonal component that obscures the trend. If you wanted to create a smaller dataset with just the observations for January, which function(s) would you use?",
+         answer('arrange'),
+         answer('filter', correct = TRUE),
+         answer('select'),
+         answer('mutate'),
+         answer('summarize'),
+         answer('group_by'),
+         type = 'multiple',
+         allow_retry = TRUE
+)
+```
+
+
+```{r review2, echo=FALSE}
+question("Suppose that you wanted to find the largest value. One way would be to arrange() the data. But another way would return only the maximum value for the entire dataset, which function(s) would you use with max()?",
+         answer('arrange'),
+         answer('filter'),
+         answer('select'),
+         answer('mutate'),
+         answer('summarize', correct = TRUE),
+         answer('group_by'),
+         type = 'multiple',
+         allow_retry = TRUE
+)
+```
+
+```{r review3, echo=FALSE}
+question("If you wanted to calculate the average co2 for each year, which function(s) would you use?",
+         answer('arrange'),
+         answer('filter'),
+         answer('select'),
+         answer('mutate'),
+         answer('summarize', correct = TRUE),
+         answer('group_by', correct = TRUE),
+         type = 'multiple',
+         allow_retry = TRUE
+)
+```

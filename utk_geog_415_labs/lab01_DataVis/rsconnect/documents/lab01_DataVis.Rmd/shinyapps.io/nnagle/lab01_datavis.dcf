@@ -1,0 +1,10 @@
+name: lab01_datavis
+title:
+username:
+account: nnagle
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1109977
+bundleId: 2349547
+url: https://nnagle.shinyapps.io/lab01_datavis/
+when: 1566592147.55694

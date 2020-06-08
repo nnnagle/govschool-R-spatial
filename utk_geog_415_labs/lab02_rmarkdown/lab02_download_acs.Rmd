@@ -1,0 +1,47 @@
+---
+title: "Get and process ACS data"
+author: "Nicholas Nagle"
+date: "9/5/2019"
+output: html_document
+---
+
+```{r}
+library(tidycensus)
+options(tigris_use_cache = TRUE)
+
+v16 <- load_variables(2016, 'acs5')
+sex_by_age_var <- v16 %>% filter(str_detect(name, pattern='B01001_')) %>% separate(label, sep='!!', into=c('V1', 'V2', 'SEX', 'AGE')) %>%
+  mutate(AGER = AGE) %>%
+  mutate(AGER = ifelse(AGER %in% c('18 and 19 years', '20 years', '21 years'),'18 to 21 years', AGER))
+
+race_var <- v16 %>% filter(str_detect(name, pattern='B02001_')) %>% separate(label, sep='!!', into=c('V1','V2','RACE'))
+hisp_var <- v16 %>%  filter(str_detect(name, pattern='B03003_'))  %>% separate(label, sep='!!', into=c('V1','V2','HISPANIC'))
+med_inc_var <- v16 %>%  filter(str_detect(name, pattern='B19013_'))  %>% separate(label, sep='!!', into=c('V1', 'MEDHHINC'))
+value_var <- v16 %>%  filter(str_detect(name, pattern='B25077_'))  %>% separate(label, sep='!!', into=c('V1', 'MEDHVALUE'))
+
+var_list <- c(sex_by_age$name, race$name, hisp$name, med_inc$name, value_name)
+
+sex_by_age <- get_acs(geography = 'tract', variables = sex_by_age_var$name, state="TN", county='Knox', geometry=FALSE, year=2016) %>%
+  left_join(sex_by_age_var, by=c('variable'='name')) %>%
+  group_by(GEOID, NAME,V1, V2, AGER) %>%
+  summarize(estimate=sum(estimate)) %>%
+  ungroup()
+sex_by_age <- sex_by_age %>% 
+  pivot_wider(names_from='AGER', names_prefix='AGE',values_from = 'estimate') %>% 
+  select(GEOID, AGE18_21=`AGE18 to 21 years`, TOTAL_POP = AGENA)
+
+other_dat <- get_acs(geography = 'tract', variables = c('B02001_002', 'B19013_001', 'B25077_001'), state="TN", county='Knox', geometry=FALSE, year=2016) %>%
+  mutate(variable = ifelse(variable=="B02001_002", 'WHITE', variable)) %>%
+  mutate(variable = ifelse(variable=="B19013_001", 'MEDHHINC', variable)) %>%
+  mutate(variable = ifelse(variable=="B25077_001", 'MEDHVALUE', variable)) %>%
+  select(-moe) %>%
+  pivot_wider(names_from='variable', values_from='estimate')
+
+
+shape <- get_acs(geography = 'tract', variables = 'B01001_001', state="TN", county='Knox', geometry=TRUE, year=2016) %>% 
+  select(GEOID, geometry)
+
+all_dat <- shape %>% left_join(sex_by_age) %>% left_join(other_dat %>% select(-NAME), by='GEOID')
+st_write(all_dat, dsn='knox_acs.shp')
+
+```

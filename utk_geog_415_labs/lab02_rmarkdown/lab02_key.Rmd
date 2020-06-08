@@ -1,0 +1,89 @@
+---
+title: "lab02_key"
+author: "Nicholas Nagle"
+date: "9/5/2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r}
+library(tidyverse)
+library(sf)
+```
+
+Load the shapefile 'knox_acs.shp' into R.
+
+```{r}
+knox <- st_read('knox_acs.shp')
+```
+
+Create a new column called 'college_frac' that has the percentage of population between ages 18 and 21.
+
+```{r}
+knox <- knox  %>%
+  mutate(college_frac = AGE18_21 / TOTAL_POP)
+```
+
+Create a choropleth map of the proportion of the population age 18-21.
+```{r}
+ggplot(knox) + ggspatial::annotation_map_tile() +
+  geom_sf(aes(fill=college_frac), alpha=.7) + 
+  labs(fill = "Proportion age 18-21")
+```
+
+Plot a histogram of Median HH Income and label the axes appropriately. Describe the shape of this distribution.
+
+```{r}
+ggplot(knox) + geom_histogram(aes(x=MEDHHINC/1000), binwidth=10) + labs(x='Median HH Income ($1000s)')
+
+```
+
+
+Create a scatterplot with HHincome (in 1000s) on the x axis and House Value (in $1000s) on the y-axis. Set the alpha level to the population of each census tract.
+
+```{r, fig.width=5, fig.height=5, dev='pdf'}
+ggplot(knox, aes(x=MEDHHINC/1000,y=MEDHVALUE/1000, alpha=TOTAL_POP)) + geom_point() +
+  labs(x='Median HH Income ($1000s)', y='Median House Value ($1000s)', alpha='Population')
+```
+
+Calculate the three correlation coefficients between HH Income, House Value, and percent 18-21.
+Display those correlation coefficients as a table AND use them in markdown in a sentence.
+
+Briefly explain why you think each correlation is strong or weak, positive or negative.
+
+
+```{r}
+summary_stat <- knox %>% st_set_geometry(NULL) %>% 
+  summarize(mn_inc = mean(MEDHHINC, na.rm=TRUE),
+            cor1 = cor(MEDHHINC, MEDHVALUE,use='complete.obs'),
+            cor2 = cor(MEDHHINC, college_frac, use='complete.obs'),
+            cor3 = cor(MEDHVALUE, college_frac, use='complete.obs')) 
+
+summary_stat$cor1
+```
+
+The correlation between HH income and Home value is `r summary_stat$cor1`.
+The correlation between HH income and % ages 18-21 is `r summary_stat$cor2`.
+The correlation between home value and % ages 18-21 is `r summary_stat$cor3`.
+
+```{r}
+summary_stat <- knox %>% st_set_geometry(NULL) %>% 
+  summarize(mn_inc = mean(MEDHHINC, na.rm=TRUE),
+            cor1 = cor(MEDHHINC, MEDHVALUE,use='complete.obs'),
+            cor2 = cor(MEDHHINC, college_frac, use='complete.obs'),
+            cor3 = cor(MEDHVALUE, college_frac, use='complete.obs')) 
+
+
+```
+
+
+
+The correlationis `r summary_stat$cor1`
+
+
+
+
+
+
+
