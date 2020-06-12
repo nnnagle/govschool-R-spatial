@@ -188,10 +188,10 @@ ggplot(data=counties) +
   ggtitle('Percent Black or African-American')
 ```
 
-To save a file to disk, so that you can insert it into a word document, for example, you use the `ggsave` function, like so:
+Finally, youl will want to save your plots so that you can insert the into a word document. Use the `ggsave` function, like so:
 
 ```{r}
 ggsave(filename = 'Black_Tennessee.png', height = 4, width=6)
 ```
 
-This will save the last plot to a file.  Common file formats are '.png' and '.pdf'
+This will save the last plot to a file. I find that a 4 in by 6 in plot is usually about the right size for a word document, with a little bit of resizing inside word.  Common file formats are '.png' and '.pdf'
