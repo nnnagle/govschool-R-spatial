@@ -1,0 +1,124 @@
+---
+title: "COVID 19 package"
+output: html_document
+---
+
+A group of scholars in Italy has created a really neat package for downloading a bunch of COVID data all at once, for the entire world.
+
+```{r}
+library(tidyverse)
+library(COVID19)
+```
+
+
+The following code will download county level data for the US.
+```{r}
+covid_county <- covid19(c('US'), level=3)
+```
+To getstate-level data, change level to 2.
+
+There's a ton of stuff here:
+
+```{r}
+glimpse(covid_county)
+```
+
+Note the `key_numeric` column: that is a FIPS code that you can match to the GEOID in the Census shapefiles. Unfortunately, not every state is present.
+
+Here's a quick map of deaths on April 15th. We'll use hollow bubbles at each lat/lon. Note, this is not a shapefile, so we can't use geom_sf. This is a geom_point(): I've used shape=1 to tell it to use bubbles (I had to google this) and alpha=.5 to allow the circles to be slightly transparent, and I'll make all the circles blue because who doesn't love blue?
+
+```{r}
+data <- covid_county %>%
+  filter(latitude > 26) %>% # Sorry Hawaii
+  filter(latitude < 50) # Sorry Alaska
+ggplot(data = data %>% filter(date == lubridate::as_date('2020-04-15')),
+       mapping = aes(x=longitude, y=latitude)) + 
+  geom_point(aes(size = deaths), alpha=.5, shape=1, color='blue') +
+  coord_map() # Tells ggplot to plot with the mercator projection
+```
+
+I want to get rid of the counties with zero counts, because I think that they are misleading. Also, mercator maps are ugly:
+
+```{r}
+ggplot(data = data %>% 
+         filter(date == lubridate::as_date('2020-04-15')) %>%
+         filter(deaths > 0),
+       mapping = aes(x=longitude, y=latitude)) + 
+  geom_point(aes(size = deaths), alpha=.5, shape=1, color='blue') +
+  scale_size_area(max_size=8) + # Adjust the maximum size if necessary.
+  coord_map("albers",lat0=39, lat1=45) # Tells ggplot to plot with the Albers projection, centered over the United States.
+```
+
+It would be great to have a boundary map of states.  I had to google this, but his page helped: https://eriqande.github.io/rep-res-web/lectures/making-maps-with-R.html
+
+```{r}
+library(ggmap)
+state_boundaries <- map_data('state')
+
+ggplot(data = data %>% 
+         filter(date == lubridate::as_date('2020-05-15')) %>%
+         filter(deaths>0),
+       mapping = aes(x=longitude, y=latitude)) + 
+  geom_path(data = state_boundaries,
+               mapping = aes(x=long, y=lat, group=group)) +
+  geom_point(aes(size = deaths), alpha=.5, shape=1, color='blue') +
+  scale_size_area(max_size=8) +
+  coord_map("albers",lat0=39, lat1=45)
+```
+Now I want to lighten up the state boundaries, and remove the grid:
+
+```{r}
+ggplot(data = data %>% 
+         filter(date == lubridate::as_date('2020-05-15')) %>%
+         filter(deaths>0),
+       mapping = aes(x=longitude, y=latitude)) + 
+  geom_path(data = state_boundaries,
+               mapping = aes(x=long, y=lat, group=group), color='grey60') +
+  geom_point(aes(size = deaths), alpha=.5, shape=1, color='blue') +
+  scale_size_area(max_size=8) + 
+  coord_map("albers",lat0=39, lat1=45) + 
+theme_void()
+```
+
+
+
+
+
+Finally, Let's create a time series of plots. I think this is pretty cool. It requires a different filter of the data, but the map time series is just one extral line of code:  adding a `facet_wrap()` like so:
+
+
+```{r}
+dates <- c('2020-03-01','2020-03-15','2020-04-01','2020-04-15','2020-05-01','2020-05-15','2020-06-01')
+ggplot(data = data %>% 
+         filter(date %in% lubridate::as_date(dates)) %>%
+         filter(deaths>0),
+       mapping = aes(x=longitude, y=latitude)) + 
+  geom_path(data = state_boundaries,
+               mapping = aes(x=long, y=lat, group=group), color='grey60') +
+  geom_point(aes(size = deaths), alpha=.5, shape=1, color='blue') +
+  scale_size_area(max_size=8) +
+  facet_wrap(~date) +
+  coord_map("albers",lat0=39, lat1=45) +
+  theme_void()
+```
+
+This will be best saved out as a full size image: width = 11 and height = 8.5.
+
+
+Finally, here's some code that I used to experiment with merging it to the county shapefile. Not every county could be merged, and it wasn't very attractive. But I'm putting it here for study.
+
+```{r}
+library(sf)
+county_map <- st_read('data/cb_2018_us_county_20m.shp')
+county_map <- left_join(
+  x = county_map %>% mutate(GEOID = as.character(GEOID)),
+  y = covid_county %>% mutate(GEOID = as.character(key_numeric)),
+  by=c('GEOID'))
+
+plt <- ggplot(data = county_map %>% 
+         filter(date == lubridate::as_date('2020-04-15'))) + 
+  geom_sf(mapping = aes(fill = deaths))
+```
+
+
+
